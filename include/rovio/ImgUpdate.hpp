@@ -369,6 +369,14 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   /** \brief Destructor
    */
   virtual ~ImgUpdate(){};
+  
+  
+  
+      // save the time cost of msckf
+  mutable double time_cost_per_iter;
+  
+
+
 
   /** \brief Refresh the properties of the property handler
    */
@@ -404,6 +412,11 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
    *  @param noise        - Additive discrete Gaussian noise.
    */
   void evalInnovation(mtInnovation& y, const mtState& state, const mtNoise& noise) const{
+    
+    // add by Yipu
+    double start_time = (double) cv::getTickCount();
+    
+    
     const int& ID = state.aux().activeFeature_;
     const int& camID = state.CfP(ID).camID_;
     const int activeCamID = (state.aux().activeCameraCounter_ + camID)%mtState::nCam_;
@@ -437,9 +450,19 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
       pixError(1) = static_cast<double>(state.aux().feaCoorMeas_[ID].get_c().y - featureOutput_.c().get_c().y);
       y.template get<mtInnovation::_pix>() = pixError+noise.template get<mtNoise::_pix>();
     }
+    
+    // add by Yipu
+   double end_time = (double) cv::getTickCount();
+   time_cost_per_iter += (end_time - start_time)/cv::getTickFrequency();
+   
   }
 
   bool generateCandidates(const mtFilterState& filterState, mtState& candidate) const{
+    
+    // add by Yipu
+    double start_time = (double) cv::getTickCount();
+    
+    
     candidate = filterState.state_;
 
     if(candidateCounter_ == 0){
@@ -468,13 +491,32 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
             + v*alignConvergencePixelRange_*candidateGenerationES_.eigenvectors().col(1).real();
         canditateGenerationDifVec_ = -filterState.cov_*canditateGenerationH_.transpose()*canditateGenerationPy_.inverse()*dy;
         candidate.boxPlus(canditateGenerationDifVec_,candidate);
+      
+      
+      // add by Yipu
+   double end_time = (double) cv::getTickCount();
+   time_cost_per_iter += (end_time - start_time)/cv::getTickFrequency();
+   
+   
         return true;
       }
     }
+    
+    
+    // add by Yipu
+   double end_time = (double) cv::getTickCount();
+   time_cost_per_iter += (end_time - start_time)/cv::getTickFrequency();
+   
+   
     return false;
   }
 
   bool extraOutlierCheck(const mtState& state) const{
+    
+    // add by Yipu
+    double start_time = (double) cv::getTickCount();
+    
+    
     const int& ID = state.aux().activeFeature_;
     const int& camID = state.CfP(ID).camID_;
     const int activeCamID = (state.aux().activeCameraCounter_ + camID)%mtState::nCam_;
@@ -532,6 +574,13 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
       }
     }
 
+    
+                  // add by Yipu
+   double end_time = (double) cv::getTickCount();
+   time_cost_per_iter += (end_time - start_time)/cv::getTickFrequency();
+   
+   
+   
     featureOutput_.c().drawPoint(drawImg_, cv::Scalar(0,0,255),1.0);
     return true;
   }
@@ -643,6 +692,11 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
    *  @todo split into methods
    */
   void preProcess(mtFilterState& filterState, const mtMeas& meas, bool& isFinished){
+    
+   //  std::cout << "func preProcess being called!" << std::endl;
+     // add by Yipu
+    double start_time = (double) cv::getTickCount();
+     
     if(isFinished){ // gets called if this is the first call
       commonPreProcess(filterState,meas);
       isFinished = false;
@@ -765,6 +819,12 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     if(ID >= mtState::nMax_){
       isFinished = true;
     }
+    
+    
+    double end_time = (double) cv::getTickCount();
+  // std::cout << "time cost of preProcess = " << (end_time - start_time)/cv::getTickFrequency()*1000 << std::endl;
+   time_cost_per_iter = (end_time - start_time)/cv::getTickFrequency();
+    
   };
 
   /** \brief Post-Processing for the image update.
@@ -779,6 +839,11 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
    *  @param isFinished       - True, if process has finished.
    */
   void postProcess(mtFilterState& filterState, const mtMeas& meas, const mtOutlierDetection& outlierDetection, bool& isFinished){
+    
+   // std::cout << "func postProcess being called!" << std::endl;
+        // add by Yipu
+    double start_time = (double) cv::getTickCount();
+    
     int& ID = filterState.state_.aux().activeFeature_;  // Get the ID of the updated feature.
     int& activeCamCounter = filterState.state_.aux().activeCameraCounter_;
 
@@ -877,6 +942,14 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
         ID++;
       }
     }
+  
+    
+              // add by Yipu
+   double end_time = (double) cv::getTickCount();
+  // std::cout << "time cost of postProcess = " << (end_time - start_time)/cv::getTickFrequency()*1000 << std::endl;
+   time_cost_per_iter += (end_time - start_time)/cv::getTickFrequency();
+   
+    
   };
 
   /** \brief Final Post-Processing step for the image update.

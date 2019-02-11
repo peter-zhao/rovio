@@ -1,0 +1,1 @@
+catkin build rovio --cmake-args -DCMAKE_BUILD_TYPE=Release -DMAKE_SCENE=OFF -DROVIO_NCAM=1 -DROVIO_NMAXFEATURE=25

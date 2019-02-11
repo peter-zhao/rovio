@@ -58,6 +58,47 @@
 
 namespace rovio {
 
+  class timeLog {
+public:
+  timeLog(const double &timeStamp_, const double &timeCost_1, const double &timeCost_2) {
+    time_stamp = timeStamp_;
+    time_cost_1 = timeCost_1;
+    time_cost_2 = timeCost_2;
+  };
+
+  double time_stamp;
+  double time_cost_1;
+  double time_cost_2;
+};
+
+class trackLog {
+public:
+  trackLog(const double &timeStamp_, const double &Tx_, const double &Ty_, const double &Tz_, 
+	   const double &Qx_, const double &Qy_, const double &Qz_, const double &Qw_) {
+    //
+    time_stamp = timeStamp_;
+    position(0) = Tx_;
+    position(1) = Ty_;
+    position(2) = Tz_;
+    orientation(0) = Qx_;
+    orientation(1) = Qy_;
+    orientation(2) = Qz_;
+    orientation(3) = Qw_;
+  };
+
+  double time_stamp;
+    // Orientation
+  // Take a vector from the world frame to
+  // the IMU (body) frame.
+  Eigen::Vector4d orientation;
+
+  // Position of the IMU (body) frame
+  // in the world frame.
+  Eigen::Vector3d position;
+};
+
+
+
 /** \brief Class, defining the Rovio Node
  *
  *  @tparam FILTER  - \ref rovio::RovioFilter
@@ -83,6 +124,56 @@ class RovioNode{
   typedef typename std::tuple_element<2,typename mtFilter::mtUpdates>::type mtVelocityUpdate;
   typedef typename mtVelocityUpdate::mtMeas mtVelocityMeas;
   mtVelocityMeas velocityUpdateMeas_;
+  
+  
+  // save the time cost of msckf
+  std::vector<timeLog> logTimeCost;
+  
+   void saveTimeLog(const std::string &filename) {
+
+    std::cout << std::endl << "Saving " << this->logTimeCost.size() << " records to time log file " << filename << " ..." << std::endl;
+
+    std::ofstream fFrameTimeLog;
+    fFrameTimeLog.open(filename.c_str());
+    fFrameTimeLog << std::fixed;
+    fFrameTimeLog << "#frame_time_stamp time_proc_1 time_proc_2" << std::endl;
+    for(size_t i=0; i<this->logTimeCost.size(); i++)
+    {
+        fFrameTimeLog << std::setprecision(6)
+                      << this->logTimeCost[i].time_stamp << " "
+                      << this->logTimeCost[i].time_cost_1 << " "
+                      << this->logTimeCost[i].time_cost_2 << std::endl;
+    }
+    fFrameTimeLog.close();
+
+    std::cout << "Finished saving log! " << std::endl;
+}
+
+
+std::vector<trackLog> logFramePose;
+    
+    
+void saveAllFrameTrack(const std::string &filename) {
+  
+  std::cout << std::endl << "Saving " << this->logFramePose.size() << " records to track file " << filename << " ..." << std::endl;
+
+    std::ofstream f_realTimeTrack;
+    f_realTimeTrack.open(filename.c_str());
+    f_realTimeTrack << std::fixed;
+    f_realTimeTrack << "#TimeStamp Tx Ty Tz Qx Qy Qz Qw" << std::endl;
+    for(size_t i=0; i<this->logFramePose.size(); i++)
+    {
+      f_realTimeTrack << std::setprecision(6)
+			<< this->logFramePose[i].time_stamp << " "
+			<< std::setprecision(7)
+			<< this->logFramePose[i].position.transpose() << " "
+			<< this->logFramePose[i].orientation.transpose() << std::endl;
+    }
+    f_realTimeTrack.close();
+
+    std::cout << "Finished saving track! " << std::endl;
+}
+
 
   struct FilterInitializationState {
     FilterInitializationState()
@@ -507,6 +598,10 @@ class RovioNode{
     cv::Mat cv_img;
     cv_ptr->image.copyTo(cv_img);
     if(init_state_.isInitialized() && !cv_img.empty()){
+      
+      // add by Yipu
+      // double start_time = (double) cv::getTickCount();
+      
       double msgTime = img->header.stamp.toSec();
       if(msgTime != imgUpdateMeas_.template get<mtImgMeas::_aux>().imgTime_){
         for(int i=0;i<mtState::nCam_;i++){
@@ -523,6 +618,15 @@ class RovioNode{
         mpFilter_->template addUpdateMeas<0>(imgUpdateMeas_,msgTime);
         imgUpdateMeas_.template get<mtImgMeas::_aux>().reset(msgTime);
         updateAndPublish();
+	
+	
+      // add by Yipu
+// double end_time = (double) cv::getTickCount();
+// double took_time = (end_time - start_time)/cv::getTickFrequency();
+// logTimeCost.push_back(timeLog(msgTime, mpImgUpdate_->time_cost_per_iter, mpImgUpdate_->time_cost_per_iter + took_time));
+// std::cout << "time cost per frame = " << mpImgUpdate_->time_cost_per_iter * 1000 << "; " << took_time * 1000 << std::endl;
+   
+   
       }
     }
   }
@@ -704,6 +808,22 @@ class RovioNode{
         tf_transform_MW.setOrigin(tf::Vector3(imuOutput_.WrWB()(0),imuOutput_.WrWB()(1),imuOutput_.WrWB()(2)));
         tf_transform_MW.setRotation(tf::Quaternion(imuOutput_.qBW().x(),imuOutput_.qBW().y(),imuOutput_.qBW().z(),-imuOutput_.qBW().w()));
         tb_.sendTransform(tf_transform_MW);
+	
+	  
+         //
+  // add by Yipu
+  // save real-time published imu state for batch eval
+  logFramePose.push_back( trackLog( mpFilter_->safe_.t_, 
+				    imuOutput_.WrWB()(0), 
+				    imuOutput_.WrWB()(1),
+				    imuOutput_.WrWB()(2),
+				    imuOutput_.qBW().x(),
+				    imuOutput_.qBW().y(),
+				    imuOutput_.qBW().z(),
+				    -imuOutput_.qBW().w() ) );
+  
+  
+  
 
         // Send camera pose.
         for(int camID=0;camID<mtState::nCam_;camID++){
@@ -1001,6 +1121,17 @@ class RovioNode{
           pubPatch_.publish(patchMsg_);
         }
         gotFirstMessages_ = true;
+      }
+    
+      // Add by Yipu
+      const double t3 = (double) cv::getTickCount();
+      if (c1-c2 > 0) {
+	logTimeCost.push_back(timeLog(mpFilter_->safe_.t_, (t2-t1)/cv::getTickFrequency(), (t3-t1)/cv::getTickFrequency()));
+	//
+     // timing_T += (t3-t1)/cv::getTickFrequency()*1000;
+     // timing_C += c1-c2;
+//	ROS_INFO_STREAM(" == Filter Update: image processing = " << (t2-t1)/cv::getTickFrequency()*1000 
+//        << " ms; total processing = " << (t3-t1)/cv::getTickFrequency()*1000 << " ms; average: " << timing_T/timing_C);
       }
     }
   }

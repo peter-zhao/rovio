@@ -136,6 +136,9 @@ class ImagePyramid{
    *                             See http://docs.opencv.org/trunk/df/d74/classcv_1_1FastFeatureDetector.html
    */
   void detectFastCorners(FeatureCoordinatesVec & candidates, int l, int detectionThreshold) const{
+    
+   // std::cout << "func detectFastCorners being called!" << std::endl;
+    
     std::vector<cv::KeyPoint> keypoints;
 #if (CV_MAJOR_VERSION < 3)
     cv::FastFeatureDetector feature_detector_fast(detectionThreshold, true);

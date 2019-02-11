@@ -124,5 +124,13 @@ int main(int argc, char** argv){
 #else
   ros::spin();
 #endif
+  
+  // add by Yipu
+  std::cout << "terminated! saving the time cost log!" << std::endl;
+  rovioNode.saveTimeLog("/mnt/DATA/tmpLog.txt");
+  std::cout << "move on saving the track log!" << std::endl;
+  rovioNode.saveAllFrameTrack("/mnt/DATA/tmpTrack.txt");
+  
+  
   return 0;
 }

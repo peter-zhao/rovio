@@ -20,9 +20,12 @@ if(0)
 	find_package(OpenMP REQUIRED)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
-find_package(Eigen3 REQUIRED)
+# find_package(Eigen3 REQUIRED)
+find_package(PkgConfig)
+pkg_search_module(Eigen3 REQUIRED eigen3)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+set(OpenCV_DIR /opt/opencv3/share/OpenCV)
 find_package(OpenCV REQUIRED COMPONENTS core highgui imgproc features2d)
 
 if(MAKE_SCENE)
